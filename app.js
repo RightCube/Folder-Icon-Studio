@@ -329,102 +329,67 @@
     path.quadraticCurveTo(x, y, x + r1, y);
   }
 
-  // Přesná silueta složky ve stylu Windows 11 (pro výchozí plátno 512×512)
-function getWin11FolderPaths() {
-  const tab = new Path2D();
-  // Záložka
-  tab.moveTo(112, 126);
-  tab.quadraticCurveTo(112, 112, 126, 112);
-  tab.lineTo(268, 112);
-  tab.quadraticCurveTo(286, 112, 286, 130);
-  tab.lineTo(274, 178);
-  tab.quadraticCurveTo(270, 188, 260, 188);
-  tab.lineTo(134, 188);
-  tab.quadraticCurveTo(116, 188, 112, 170);
-  tab.closePath();
+  function drawFolder(ctx, size, opts) {
+    const s = size;
+    ctx.clearRect(0, 0, s, s);
+    ctx.save();
+    ctx.scale(s/512, s/512);
 
-  // Horní „rim“
-  const rim = new Path2D();
-  rim.moveTo(72, 208);
-  rim.quadraticCurveTo(200, 184, 360, 206);
-  rim.quadraticCurveTo(432, 216, 456, 232);
-  rim.lineTo(456, 248);
-  rim.quadraticCurveTo(426, 232, 356, 220);
-  rim.quadraticCurveTo(204, 196, 72, 220);
-  rim.closePath();
+    const { bodyColor, tabColor, corner, shadow, strokeColor, strokeWidth, gradient, gradientDarken } = opts;
 
-  // Tělo
-  const body = new Path2D();
-  body.moveTo(72, 220);
-  body.quadraticCurveTo(204, 196, 356, 220);
-  body.quadraticCurveTo(426, 232, 456, 248);
-  body.lineTo(456, 380);
-  body.quadraticCurveTo(456, 412, 424, 412);
-  body.lineTo(88, 412);
-  body.quadraticCurveTo(56, 412, 56, 380);
-  body.lineTo(56, 248);
-  body.quadraticCurveTo(56, 228, 72, 220);
-  body.closePath();
+    // Background checker if needed
+    if (!state.transparentBG) {
+      ctx.save();
+      const cell = 16;
+      for (let y=0;y<s;y+=cell) for (let x=0;x<s;x+=cell) {
+        const odd = ((x/cell)+(y/cell)) % 2 === 1;
+        ctx.fillStyle = odd ? "#e9ecef" : "#f8f9fa";
+        ctx.fillRect(x, y, cell, cell);
+      }
+      ctx.restore();
+    }
 
-  return { tab, rim, body };
-}
+    // Shadow
+    if (shadow > 0) {
+      ctx.save();
+      ctx.filter = `blur(${shadow*2}px)`;
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      const p = new Path2D();
+      roundedRectPath(p, 32, 128, 448, 320, corner+6,corner+6,corner+6,corner+6);
+      ctx.fill(p);
+      ctx.restore();
+    }
 
-function drawFolder(ctx, size, opts) {
-  
-  // Nová kresba siluety složky (Win11) s notch
-  const { bodyColor = '#FFD65A', tabColor = '#FFC83D', strokeWidth = 0, strokeColor = '#000000', gradient = true, gradientDarken = 0.2, shadow = 6 } = opts || {};
-  const s = (size || 512) / 512;
-  ctx.save();
-  ctx.scale(s, s);
+    // Tab
+    const tab = new Path2D();
+    roundedRectPath(tab, 72, 96, 184, 72, corner*.8, corner*.8, corner*.3, corner*.3);
+    if (gradient) {
+      const g = ctx.createLinearGradient(72,96,72,168);
+      g.addColorStop(0, tabColor);
+      g.addColorStop(1, shadeColor(tabColor, -gradientDarken));
+      ctx.fillStyle = g;
+    } else ctx.fillStyle = tabColor;
+    ctx.fill(tab);
 
-  const { tab, body, rim } = getWin11FolderPaths();
+    // Body
+    const body = new Path2D();
+    roundedRectPath(body, 48,136,416,288, corner,corner,corner,corner);
+    if (gradient) {
+      const g2 = ctx.createLinearGradient(48,136,48,424);
+      g2.addColorStop(0, bodyColor);
+      g2.addColorStop(1, shadeColor(bodyColor, -gradientDarken));
+      ctx.fillStyle = g2;
+    } else ctx.fillStyle = bodyColor;
+    ctx.fill(body);
 
-  // --- TAB (vzadu) ---
-  if (gradient) {
-    const gTab = ctx.createLinearGradient(80, 80, 80, 168);
-    gTab.addColorStop(0, tabColor);
-    gTab.addColorStop(1, shadeColor(tabColor, -gradientDarken));
-    ctx.fillStyle = gTab;
-  } else { ctx.fillStyle = tabColor; }
-  ctx.save();
-  if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.12)'; ctx.shadowBlur = shadow; ctx.shadowOffsetY = shadow*0.3; }
-  ctx.fill(tab);
-  ctx.restore();
+    if (strokeWidth > 0) {
+      ctx.lineWidth = strokeWidth;
+      ctx.strokeStyle = strokeColor;
+      ctx.stroke(body);
+    }
 
-  // --- BODY (překryje část záložky, tvoří notch) ---
-  if (gradient) {
-    const gBody = ctx.createLinearGradient(72, 176, 72, 424);
-    gBody.addColorStop(0, bodyColor);
-    gBody.addColorStop(1, shadeColor(bodyColor, -gradientDarken));
-    ctx.fillStyle = gBody;
-  } else { ctx.fillStyle = bodyColor; }
-  ctx.save();
-  if (shadow > 0) { ctx.shadowColor = 'rgba(0,0,0,0.20)'; ctx.shadowBlur = shadow*1.2; ctx.shadowOffsetY = shadow*0.7; }
-  ctx.fill(body);
-  ctx.restore();
-
-  // --- RIM (highlight) nad tělem ---
-  ctx.save();
-  const rimLight = shadeColor(bodyColor, +0.20);
-  const rimDark  = shadeColor(bodyColor, -0.03);
-  const gRim = ctx.createLinearGradient(84, 180, 84, 226);
-  gRim.addColorStop(0, rimLight);
-  gRim.addColorStop(1, rimDark);
-  ctx.fillStyle = gRim;
-  ctx.fill(rim);
-  ctx.restore();
-
-  // --- VOLITELNÝ OBRYS ---
-  if (strokeWidth > 0) {
-    ctx.lineWidth = strokeWidth;
-    ctx.strokeStyle = strokeColor;
-    ctx.stroke(body);
-    ctx.stroke(tab);
-    ctx.stroke(rim);
+    ctx.restore();
   }
-
-  ctx.restore();
-
 
   function drawOverlay(ctx, size, o) {
     const x = o.x * size;
